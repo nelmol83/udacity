@@ -1,0 +1,116 @@
+
+-- Questions solutions 
+
+
+*****************************************************************
+-- Q1:/* What is the number of movies on my favorite category?*/ 
+*****************************************************************
+WITH 
+
+CATEGORIES AS ( 
+SELECT 
+  FC.film_id
+, C.name
+FROM film_category AS FC
+JOIN category AS C 
+ON C.category_id = FC.category_id
+				)
+
+, 
+
+TITLE_CATEGORIES AS (
+SELECT 
+  DISTINCT f.title AS title
+, UC.name AS Category
+, F.rental_duration
+, ntile(4) OVER (PARTITION BY f.rental_duration) AS quartile
+FROM film AS F
+JOIN CATEGORIES AS UC
+ON UC.film_id = F.film_id
+WHERE UC.name IN ('Drama', 'Animation', 'Sci-Fi', 'Comedy', 'Classics', 'Foreign')
+ORDER BY 4,3
+					)
+
+
+SELECT 
+  Category
+, count(*) AS Q_Movies
+FROM TITLE_CATEGORIES 
+GROUP BY 1
+ORDER BY 2
+
+************************************************************************************************
+-- Q2: /* How is the distribution of the categories of the films based on their profitability */
+************************************************************************************************
+
+SELECT 
+  c.name AS category
+, SUM(P.amount) AS total_amount
+, COUNT(R.rental_id) AS Q_rental
+, SUM(P.amount) / COUNT(R.rental_id) AS average_amount
+FROM category AS C
+JOIN film_category AS FC
+ON C.category_id = FC.category_id
+JOIN film AS F
+ON FC.film_id = F.film_id
+JOIN inventory AS I
+ON F.film_id = I.film_id
+JOIN rental AS R
+ON I.inventory_id = R.inventory_id
+JOIN payment AS P
+ON R.rental_id = P.rental_id
+GROUP BY 1
+
+************************************************************************************************
+-- Q3: /*  The duration of the movies can affect the preference to rent it?*/
+************************************************************************************************
+SELECT 
+  CASE WHEN length < 60 THEN '<1h'
+     WHEN length BETWEEN 60 AND 120 THEN '<2h'
+     WHEN length BETWEEN 121 AND 180 THEN '<3h'
+     ELSE '>3h'
+     END AS film_duration
+, COUNT(*) AS Q_rentals
+FROM film  AS F
+JOIN inventory AS I
+ON F.film_id = I.film_id
+JOIN rental AS R
+ON I.inventory_id = R.rental_id
+GROUP BY 1
+ORDER BY 2 DESC
+
+
+************************************************************************************************
+-- Q4: /*  How many times they were rented the most and least profitable films in store 2?*/
+************************************************************************************************
+WITH
+EARNINGS AS (
+SELECT 
+  title
+, SUM(amount) total_earnings
+, COUNT(*) AS Q_rentals
+FROM film AS F
+JOIN inventory AS I
+ON F.film_id = I.film_id
+JOIN rental AS R
+ON I.inventory_id = R.inventory_id
+JOIN payment AS P
+ON R.rental_id = P.rental_id
+WHERE I.store_id = 2
+GROUP BY 1
+	  )
+, TOTALERNING AS (
+SELECT 
+  MAX(total_earnings) AS max
+, MIN(total_earnings) AS min
+FROM EARNINGS
+				)
+
+SELECT 
+  title
+, total_earnings
+, Q_rentals
+FROM EARNINGS AS A
+JOIN TOTALERNING AS B
+ON A.total_earnings = B.max
+OR A.total_earnings = B.min
